@@ -13,14 +13,19 @@ bootstrap = Bootstrap()
 login_manager = LoginManager()
 
 from .views import page
-from .models import User
+from .models import User, Task
 from .consts import LOGIN_REQUIRED
 
 def create_app(config):
     app.config.from_object(config)
     
     csrf.init_app(app)
-    bootstrap.init_app(app)
+
+    if not app.config.get('TEST', False):
+        bootstrap.init_app(app)
+
+    app.app_context().push()
+
     login_manager.init_app(app)
     login_manager.login_view = '.login'
     login_manager.login_message = LOGIN_REQUIRED
