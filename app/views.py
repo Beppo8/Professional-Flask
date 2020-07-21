@@ -93,7 +93,7 @@ def new_task():
     return render_template('tasks/new.html', title='neva tarea',
                             form=form, active='new_task')
 
-@page.route('tasks/show/<int:task_id>')
+@page.route('/tasks/show/<int:task_id>')
 def get_task(task_id):
     task = Task.query.get_or_404(task_id)
 
