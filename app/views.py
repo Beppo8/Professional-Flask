@@ -1,10 +1,10 @@
 from flask import Blueprint
-from flask import render_template, request, flash, redirect, url_for
+from flask import render_template, request, flash, redirect, url_for, abort
 
 from flask_login import login_user, logout_user, login_required, current_user
 
-from .models import User
-from .forms import LoginForm, RegisterForm
+from .models import User, Task
+from .forms import LoginForm, RegisterForm, TaskForm
 from .consts import *
 
 from . import login_manager
@@ -46,7 +46,8 @@ def login():
         else:
             flash(ERROR_USER_PASSWORD, 'error')
 
-    return render_template('auth/login.html', title='Login', form=form)
+    return render_template('auth/login.html', title='Login', form=form,
+                            active='login')
 
 @page.route('/register', methods=['GET', 'POST'])
 def register():
@@ -65,9 +66,64 @@ def register():
             return redirect(url_for('.tasks'))
 
     return render_template('auth/register.html', title='Registro',
-                                                    form=form)
+                            form=form, active='register')
 
 @page.route('/tasks')
+@page.route('/tasks/<int:page>')
 @login_required
-def tasks():
-    return render_template('tasks/list.html', title='Tarea')
+def tasks(page=1, per_page=2):
+    pagination = current_user.tasks.paginate(page, per_page=per_page)
+    tasks = pagination.items
+
+    return render_template('tasks/list.html', title='Tarea', tasks=tasks,
+                            pagination=pagination, page=page,
+                            active='tasks')
+
+@page.route('/tasks/new', methods=['GET', 'POST'])
+@login_required
+def new_task():
+    form = TaskForm(request.form)
+
+    if request.method == 'POST' and form.validate():
+        task = Task.create_element(form.title.data, form.description.data,
+                                        current_user.id)
+        if task:
+                flash(TASK_CREATED)
+
+    return render_template('tasks/new.html', title='neva tarea',
+                            form=form, active='new_task')
+
+@page.route('tasks/show/<int:task_id>')
+def get_task(task_id):
+    task = Task.query.get_or_404(task_id)
+
+    return render_template('tasks/show.html', title='Tarea', task=task)
+
+@page.route('/tasks/edit/<int:task_id>', methods=['GET', 'POST'])
+@login_required
+def edit_task(task_id):
+    task = Task.query.get_or_404(task_id)
+
+    if task.user_id != current_user.id:
+        abort(404)
+
+    form = TaskForm(request.form, obj=task)
+    if request.method == 'POST' and form.validate():
+        task = Task.update_element(task.id, form.title.data, form.description.data)
+        if task:
+            flash(TASK_UPDATED)
+
+    return render_template('tasks/edit.html', title='Editar tarea', form=form)
+
+@page.route('/tasks/delete/<int:task_id>')
+@login_required
+def delete_task(task_id):
+    task = Task.query.get_or_404(task_id)
+
+    if task.user_id != current_user.id:
+        abort(404)
+
+    if Task.delete_element(task.id):
+        flash(TASK_DELETED)
+
+    return redirect(url_for('.tasks'))
